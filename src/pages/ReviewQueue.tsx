@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
-import type { Campaign, Review } from "../lib/types";
+import type { Campaign } from "../lib/types";
 
 export default function ReviewQueue() {
   const [campaign, setCampaign] = useState<Campaign | null>(null);
@@ -21,16 +21,13 @@ export default function ReviewQueue() {
         return;
       }
 
-      const [campaignResponse, reviewedResponse] = await Promise.all([
-        supabase
-          .from("campaigns")
-          .select("*")
-          .neq("owner_id", user.id)
-          .in("status", ["pending", "in_review"])
-          .order("created_at", { ascending: true })
-          .limit(50),
-        supabase.from("reviews").select("campaign_id, review_round").eq("reviewer_id", user.id),
-      ]);
+      const campaignResponse = await supabase
+        .from("campaigns")
+        .select("*")
+        .neq("owner_id", user.id)
+        .in("status", ["pending", "in_review"])
+        .order("created_at", { ascending: true })
+        .limit(1);
 
       if (campaignResponse.error) {
         setError(campaignResponse.error.message);
@@ -38,15 +35,7 @@ export default function ReviewQueue() {
         return;
       }
 
-      const reviewedRounds = new Set(
-        ((reviewedResponse.data ?? []) as Pick<Review, "campaign_id" | "review_round">[]).map(
-          (review) => `${review.campaign_id}:${review.review_round}`,
-        ),
-      );
-      const nextCampaign =
-        ((campaignResponse.data ?? []) as Campaign[]).find(
-          (item) => !reviewedRounds.has(`${item.id}:${item.review_round}`),
-        ) ?? null;
+      const nextCampaign = ((campaignResponse.data ?? []) as Campaign[])[0] ?? null;
 
       setCampaign(nextCampaign);
       setLoading(false);
