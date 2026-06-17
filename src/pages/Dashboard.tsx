@@ -196,11 +196,17 @@ export default function Dashboard() {
     loadDashboard();
   }, []);
 
-  async function resubmitCampaign(campaignId: string) {
+  async function resubmitCampaign(campaign: DashboardCampaign) {
     setError("");
-    setResubmittingCampaignId(campaignId);
+    setResubmittingCampaignId(campaign.id);
 
-    const { error: updateError } = await supabase.from("campaigns").update({ status: "pending" }).eq("id", campaignId);
+    const { data, error: updateError } = await supabase
+      .from("campaigns")
+      .update({ status: "pending", review_round: campaign.review_round + 1 })
+      .eq("id", campaign.id)
+      .eq("review_round", campaign.review_round)
+      .select("review_round, status")
+      .single();
 
     setResubmittingCampaignId("");
 
@@ -210,7 +216,11 @@ export default function Dashboard() {
     }
 
     setCampaigns((current) =>
-      current.map((campaign) => (campaign.id === campaignId ? { ...campaign, status: "pending" } : campaign)),
+      current.map((currentCampaign) =>
+        currentCampaign.id === campaign.id
+          ? { ...currentCampaign, review_round: data.review_round, status: data.status }
+          : currentCampaign,
+      ),
     );
   }
 
@@ -346,7 +356,7 @@ export default function Dashboard() {
                   <button
                     className="button button-primary"
                     type="button"
-                    onClick={() => resubmitCampaign(campaign.id)}
+                    onClick={() => resubmitCampaign(campaign)}
                     disabled={resubmittingCampaignId === campaign.id}
                   >
                     {resubmittingCampaignId === campaign.id ? "Resubmitting..." : "Resubmit campaign"}
