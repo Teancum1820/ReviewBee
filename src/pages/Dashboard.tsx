@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import StatusBadge from "../components/StatusBadge";
+import { usernameFromUser } from "../lib/auth";
 import { supabase } from "../lib/supabaseClient";
 import type { Campaign } from "../lib/types";
 
@@ -40,7 +41,7 @@ export default function Dashboard() {
     monthReviews: 0,
     unreadNotifications: 0,
   });
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -57,7 +58,13 @@ export default function Dashboard() {
         return;
       }
 
-      setEmail(user.email ?? "");
+      const profileResponse = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      setUsername(profileResponse.data?.display_name || usernameFromUser(user));
 
       const now = new Date();
       const weekStart = startOfWeek(now).toISOString();
@@ -112,7 +119,7 @@ export default function Dashboard() {
         <div>
           <p className="eyebrow">ReviewBee</p>
           <h1>Review better ads together.</h1>
-          <p className="muted">Signed in as {email}</p>
+          <p className="muted">Signed in as {username}</p>
         </div>
         <div className="hero-actions">
           <Link className="button button-primary" to="/submit">

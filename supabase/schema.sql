@@ -75,14 +75,25 @@ security definer
 set search_path = public
 as $$
 begin
-  insert into public.profiles (id, email)
-  values (new.id, new.email)
+  insert into public.profiles (id, email, display_name)
+  values (
+    new.id,
+    new.email,
+    coalesce(new.raw_user_meta_data ->> 'username', new.raw_user_meta_data ->> 'display_name')
+  )
   on conflict (id) do update
-    set email = excluded.email;
+    set
+      email = excluded.email,
+      display_name = coalesce(public.profiles.display_name, excluded.display_name);
 
   return new;
 end;
 $$;
+
+update public.profiles
+set display_name = split_part(email, '@', 1)
+where display_name is null
+  and email like '%@users.reviewbee.invalid';
 
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created

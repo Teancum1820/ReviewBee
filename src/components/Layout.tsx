@@ -1,14 +1,24 @@
 import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { usernameFromUser } from "../lib/auth";
 import { supabase } from "../lib/supabaseClient";
 
 export default function Layout() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setEmail(data.user?.email ?? "");
+    supabase.auth.getUser().then(async ({ data }) => {
+      if (!data.user) return;
+
+      const fallbackUsername = usernameFromUser(data.user);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("display_name")
+        .eq("id", data.user.id)
+        .maybeSingle();
+
+      setUsername(profile?.display_name || fallbackUsername);
     });
   }, []);
 
@@ -31,7 +41,7 @@ export default function Layout() {
           <NavLink to="/inbox">Inbox</NavLink>
         </nav>
         <div className="account-strip">
-          <span title={email}>{email}</span>
+          <span title={username}>{username}</span>
           <button className="button button-ghost" type="button" onClick={handleLogout}>
             Log out
           </button>
@@ -41,7 +51,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <footer className="app-footer">
-        <span>Version 1.0</span>
+        <span>Version 1.1</span>
         <span>Created by Caleb Day</span>
       </footer>
     </div>

@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { normalizeUsername, usernameToAuthEmail, validateUsername } from "../lib/auth";
 import { isSupabaseConfigured, supabase } from "../lib/supabaseClient";
 
 type AuthMode = "login" | "signup";
@@ -8,7 +9,15 @@ function friendlyAuthError(message: string) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("invalid login credentials")) {
-    return "That email and password did not match an account.";
+    return "That username and password did not match an account.";
+  }
+
+  if (normalized.includes("email not confirmed")) {
+    return "This Supabase project is still requiring email confirmation. Turn off Confirm email in Supabase Auth settings so username sign-in works.";
+  }
+
+  if (normalized.includes("already registered") || normalized.includes("already been registered")) {
+    return "That username is already taken.";
   }
 
   if (normalized.includes("password")) {
@@ -24,7 +33,7 @@ function friendlyAuthError(message: string) {
 
 export default function Login() {
   const [mode, setMode] = useState<AuthMode>("login");
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -59,17 +68,29 @@ export default function Login() {
       return;
     }
 
-    if (!email.trim() || !password) {
-      setError("Enter an email and password.");
+    const usernameError = validateUsername(username);
+
+    if (usernameError || !password) {
+      setError(usernameError || "Enter a password.");
       return;
     }
 
     setLoading(true);
+    const normalizedUsername = normalizeUsername(username);
+    const authEmail = usernameToAuthEmail(normalizedUsername);
 
     const response =
       mode === "signup"
-        ? await supabase.auth.signUp({ email: email.trim(), password })
-        : await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        ? await supabase.auth.signUp({
+            email: authEmail,
+            password,
+            options: {
+              data: {
+                username: normalizedUsername,
+              },
+            },
+          })
+        : await supabase.auth.signInWithPassword({ email: authEmail, password });
 
     setLoading(false);
 
@@ -79,7 +100,9 @@ export default function Login() {
     }
 
     if (mode === "signup" && !response.data.session) {
-      setMessage("Account created. If email confirmation is enabled in Supabase, confirm the account before logging in.");
+      setMessage(
+        "Account created, but Supabase is still requiring email confirmation. Turn off Confirm email in Supabase Auth settings so username sign-in works.",
+      );
       return;
     }
 
@@ -123,16 +146,16 @@ export default function Login() {
         </div>
 
         <form className="form-stack" onSubmit={handleSubmit}>
-          <label className="field-label" htmlFor="email">
-            Email
+          <label className="field-label" htmlFor="username">
+            Username
           </label>
           <input
-            id="email"
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@example.com"
+            id="username"
+            type="text"
+            autoComplete="username"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            placeholder="caleb"
           />
 
           <label className="field-label" htmlFor="password">

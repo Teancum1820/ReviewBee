@@ -665,6 +665,17 @@ dd {
   margin: 0;
 }
 
+.notification-campaign-name {
+  margin-top: 0.35rem;
+}
+
+.notification-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
 .detail-card {
   display: grid;
   gap: 1rem;
