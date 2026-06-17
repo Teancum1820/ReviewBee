@@ -27,6 +27,8 @@ create table if not exists public.reviews (
   created_at timestamptz default now()
 );
 
+drop policy if exists "Users can insert eligible reviews" on public.reviews;
+
 alter table public.campaigns
   drop constraint if exists campaigns_review_round_nonnegative;
 
