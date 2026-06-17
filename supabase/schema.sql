@@ -61,6 +61,22 @@ create index if not exists reviews_reviewer_id_created_at_idx on public.reviews(
 create index if not exists review_checklist_items_review_id_idx on public.review_checklist_items(review_id);
 create index if not exists notifications_user_id_created_at_idx on public.notifications(user_id, created_at desc);
 
+do $$
+begin
+  if exists (
+    select 1 from pg_publication where pubname = 'supabase_realtime'
+  ) and not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'notifications'
+  ) then
+    alter publication supabase_realtime add table public.notifications;
+  end if;
+end;
+$$;
+
 grant usage on schema public to anon, authenticated;
 grant select, insert, update on public.profiles to authenticated;
 grant select, insert, update on public.campaigns to authenticated;

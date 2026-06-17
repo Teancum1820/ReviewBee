@@ -1,12 +1,22 @@
 import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { usernameFromUser } from "../lib/auth";
+import {
+  getBrowserNotificationPermission,
+  requestBrowserNotificationPermission,
+  showReviewBrowserNotification,
+  type BrowserNotificationPermission,
+} from "../lib/browserNotifications";
 import { NOTIFICATION_COUNTER_UPDATED } from "../lib/notificationEvents";
 import { supabase } from "../lib/supabaseClient";
+import type { InboxNotification } from "../lib/types";
 
 export default function Layout() {
   const [username, setUsername] = useState("");
+  const [userId, setUserId] = useState("");
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [notificationPermission, setNotificationPermission] =
+    useState<BrowserNotificationPermission>("unsupported");
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -15,9 +25,12 @@ export default function Layout() {
 
     if (!data.user) {
       setUsername("");
+      setUserId("");
       setUnreadNotificationCount(0);
       return;
     }
+
+    setUserId(data.user.id);
 
     const fallbackUsername = usernameFromUser(data.user);
     const [profileResponse, unreadResponse] = await Promise.all([
@@ -34,6 +47,7 @@ export default function Layout() {
   }, []);
 
   useEffect(() => {
+    setNotificationPermission(getBrowserNotificationPermission());
     refreshUserSummary();
   }, [refreshUserSummary, location.pathname]);
 
@@ -44,6 +58,45 @@ export default function Layout() {
       window.removeEventListener(NOTIFICATION_COUNTER_UPDATED, refreshUserSummary);
     };
   }, [refreshUserSummary]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`reviewbee-notifications-${userId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          filter: `user_id=eq.${userId}`,
+          schema: "public",
+          table: "notifications",
+        },
+        (payload) => {
+          const notification = payload.new as InboxNotification;
+
+          refreshUserSummary();
+          showReviewBrowserNotification({
+            campaignId: notification.campaign_id,
+            message: notification.message,
+            onClick: () => {
+              window.focus();
+              navigate(notification.campaign_id ? `/campaign/${notification.campaign_id}` : "/inbox");
+            },
+          });
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [navigate, refreshUserSummary, userId]);
+
+  async function handleEnableBrowserNotifications() {
+    const permission = await requestBrowserNotificationPermission();
+    setNotificationPermission(permission);
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut();
@@ -72,6 +125,11 @@ export default function Layout() {
         </nav>
         <div className="account-strip">
           <span title={username}>{username}</span>
+          {notificationPermission === "default" ? (
+            <button className="button button-ghost" type="button" onClick={handleEnableBrowserNotifications}>
+              Enable alerts
+            </button>
+          ) : null}
           <button className="button button-ghost" type="button" onClick={handleLogout}>
             Log out
           </button>

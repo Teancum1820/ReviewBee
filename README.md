@@ -12,6 +12,7 @@ ReviewBee does not use the Meta API, does not send email notifications for revie
 - Required checklist review flow with Pass, Fail, and Not Sure choices
 - In-app inbox notifications when a campaign is reviewed
 - Inbox notifications show the campaign link and whether the review passed or failed
+- Browser notifications while the app is open, when the user allows alerts
 - Review stats for all time, this week, and this month
 - Campaign detail pages where owners can view reviews and checklist results
 - Supabase Row Level Security policies for private campaign and review data
@@ -96,7 +97,7 @@ Use two different user accounts. You can use two browsers, one normal window plu
 - User A opens the campaign detail page to see the review.
 - User B's review stats increase.
 
-ReviewBee creates an internal Supabase Auth email from each username, but users never enter or verify an email address.
+ReviewBee creates an internal Supabase Auth email from each username, but users never enter or verify an email address. Browser notifications work while the app is open after the user clicks **Enable alerts** and allows notifications in the browser.
 
 ## Push to GitHub
 
@@ -150,4 +151,5 @@ React Router uses `HashRouter`, so page refreshes work on GitHub Pages.
 - **Review queue is empty:** You need a campaign submitted by a different user. Users cannot review their own campaigns.
 - **Duplicate review blocked:** Each user can review a campaign only once.
 - **No inbox notification:** Notifications are created by the database trigger after a review is inserted. Confirm the trigger was created by rerunning `supabase/schema.sql`.
+- **No browser notification:** Keep ReviewBee open in a browser tab, click **Enable alerts**, and allow notifications. Browser notifications depend on Supabase Realtime, so rerun `supabase/schema.sql` after pulling version 1.1 changes.
 - **Build fails in GitHub Actions:** Confirm the Actions secrets or variables are set and named exactly `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
