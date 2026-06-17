@@ -1,6 +1,8 @@
 import { REVIEW_CHECKLIST } from "./checklist";
 import type { Profile, ReviewChecklistItem } from "./types";
 
+const USERNAME_AUTH_DOMAIN = "users.reviewbee.invalid";
+
 export type ReviewResult = "passed" | "failed";
 
 export function getReviewResult(items: Pick<ReviewChecklistItem, "status">[]): ReviewResult | undefined {
@@ -18,5 +20,17 @@ export function getReviewResultLabel(result: ReviewResult) {
 }
 
 export function getReviewerName(profile: Pick<Profile, "display_name" | "email"> | undefined, reviewerId: string) {
-  return profile?.display_name || profile?.email || `Reviewer ${reviewerId.slice(0, 8)}`;
+  const displayName = profile?.display_name?.trim();
+
+  if (displayName) {
+    return displayName;
+  }
+
+  const email = profile?.email?.trim();
+
+  if (email?.endsWith(`@${USERNAME_AUTH_DOMAIN}`)) {
+    return email.replace(`@${USERNAME_AUTH_DOMAIN}`, "");
+  }
+
+  return email || `Reviewer ${reviewerId.slice(0, 8)}`;
 }

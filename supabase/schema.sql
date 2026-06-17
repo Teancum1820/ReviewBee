@@ -15,6 +15,7 @@ create table if not exists public.campaigns (
   owner_notes text,
   status text not null default 'pending' check (status in ('pending', 'in_review', 'reviewed')),
   review_count integer not null default 0,
+  review_round integer not null default 0,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -23,10 +24,57 @@ create table if not exists public.reviews (
   id uuid primary key default gen_random_uuid(),
   campaign_id uuid references public.campaigns(id) on delete cascade not null,
   reviewer_id uuid references public.profiles(id) on delete cascade not null,
+  review_round integer not null default 0,
   overall_notes text,
-  created_at timestamptz default now(),
-  constraint reviews_campaign_reviewer_unique unique (campaign_id, reviewer_id)
+  created_at timestamptz default now()
 );
+
+alter table public.campaigns
+  add column if not exists review_round integer not null default 0;
+
+alter table public.reviews
+  add column if not exists review_round integer not null default 0;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'campaigns_review_round_nonnegative'
+      and conrelid = 'public.campaigns'::regclass
+  ) then
+    alter table public.campaigns
+      add constraint campaigns_review_round_nonnegative check (review_round >= 0);
+  end if;
+
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'reviews_review_round_nonnegative'
+      and conrelid = 'public.reviews'::regclass
+  ) then
+    alter table public.reviews
+      add constraint reviews_review_round_nonnegative check (review_round >= 0);
+  end if;
+end;
+$$;
+
+alter table public.reviews
+  drop constraint if exists reviews_campaign_reviewer_unique;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'reviews_campaign_reviewer_round_unique'
+      and conrelid = 'public.reviews'::regclass
+  ) then
+    alter table public.reviews
+      add constraint reviews_campaign_reviewer_round_unique unique (campaign_id, reviewer_id, review_round);
+  end if;
+end;
+$$;
 
 create table if not exists public.review_checklist_items (
   id uuid primary key default gen_random_uuid(),
@@ -57,6 +105,7 @@ alter table public.notifications enable row level security;
 create index if not exists campaigns_owner_id_idx on public.campaigns(owner_id);
 create index if not exists campaigns_status_created_at_idx on public.campaigns(status, created_at);
 create index if not exists reviews_campaign_id_idx on public.reviews(campaign_id);
+create index if not exists reviews_campaign_round_idx on public.reviews(campaign_id, review_round);
 create index if not exists reviews_reviewer_id_created_at_idx on public.reviews(reviewer_id, created_at);
 create index if not exists review_checklist_items_review_id_idx on public.review_checklist_items(review_id);
 create index if not exists notifications_user_id_created_at_idx on public.notifications(user_id, created_at desc);
@@ -140,16 +189,29 @@ set search_path = public
 as $$
 declare
   review_total integer;
+  current_round integer;
+  current_round_review_total integer;
 begin
+  select review_round
+  into current_round
+  from public.campaigns
+  where id = new.campaign_id;
+
   select count(*)
   into review_total
   from public.reviews
   where campaign_id = new.campaign_id;
 
+  select count(*)
+  into current_round_review_total
+  from public.reviews
+  where campaign_id = new.campaign_id
+    and review_round = current_round;
+
   update public.campaigns
   set
     review_count = review_total,
-    status = case when review_total >= 1 then 'reviewed' else status end,
+    status = case when current_round_review_total >= 1 then 'reviewed' else status end,
     updated_at = now()
   where id = new.campaign_id;
 
@@ -258,6 +320,7 @@ with check (
     where campaigns.id = reviews.campaign_id
       and campaigns.owner_id <> auth.uid()
       and campaigns.status in ('pending', 'in_review')
+      and campaigns.review_round = reviews.review_round
   )
 );
 

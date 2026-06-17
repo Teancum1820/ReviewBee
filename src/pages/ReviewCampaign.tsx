@@ -64,6 +64,7 @@ export default function ReviewCampaign() {
         .select("id")
         .eq("campaign_id", nextCampaign.id)
         .eq("reviewer_id", user.id)
+        .eq("review_round", nextCampaign.review_round)
         .maybeSingle();
 
       setReviewState(existingReview ? "already_reviewed" : "ready");
@@ -111,6 +112,7 @@ export default function ReviewCampaign() {
       .insert({
         campaign_id: campaign.id,
         reviewer_id: user.id,
+        review_round: campaign.review_round,
         overall_notes: overallNotes.trim() || null,
       })
       .select("id")
@@ -186,7 +188,7 @@ export default function ReviewCampaign() {
     return (
       <div className="narrow-page empty-state">
         <h1>You already reviewed this campaign</h1>
-        <p>Each reviewer can submit one review per campaign.</p>
+        <p>Each reviewer can submit one review per campaign round.</p>
         <Link className="button button-primary" to="/review">
           Back to Review Queue
         </Link>

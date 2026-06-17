@@ -6,7 +6,7 @@ import { supabase } from "../lib/supabaseClient";
 import type { Campaign, InboxNotification, Profile, Review, ReviewChecklistItem } from "../lib/types";
 
 type InboxNotificationView = InboxNotification & {
-  campaign?: Pick<Campaign, "id" | "ads_manager_link" | "nickname" | "status">;
+  campaign?: Pick<Campaign, "id" | "ads_manager_link" | "nickname" | "status" | "review_round">;
   result?: ReviewResult;
   reviewerName?: string;
   isLatestReview?: boolean;
@@ -59,7 +59,10 @@ export default function Inbox() {
 
       const [campaignResponse, reviewResponse, latestReviewResponse, checklistResponse] = await Promise.all([
         campaignIds.length > 0
-          ? supabase.from("campaigns").select("id, ads_manager_link, nickname, status").in("id", campaignIds)
+          ? supabase
+              .from("campaigns")
+              .select("id, ads_manager_link, nickname, status, review_round")
+              .in("id", campaignIds)
           : Promise.resolve({ data: [], error: null }),
         reviewIds.length > 0
           ? supabase.from("reviews").select("id, reviewer_id").in("id", reviewIds)
@@ -104,9 +107,12 @@ export default function Inbox() {
       }
 
       const campaignsById = new Map(
-        ((campaignResponse.data ?? []) as Pick<Campaign, "id" | "ads_manager_link" | "nickname" | "status">[]).map(
-          (campaign) => [campaign.id, campaign],
-        ),
+        (
+          (campaignResponse.data ?? []) as Pick<
+            Campaign,
+            "id" | "ads_manager_link" | "nickname" | "status" | "review_round"
+          >[]
+        ).map((campaign) => [campaign.id, campaign]),
       );
       const reviewsById = new Map(reviewRows.map((review) => [review.id, review]));
       const latestReviewIdByCampaignId = new Map<string, string>();
@@ -175,11 +181,17 @@ export default function Inbox() {
     notifyNotificationCounterUpdated();
   }
 
-  async function resubmitCampaign(campaignId: string) {
+  async function resubmitCampaign(campaign: NonNullable<InboxNotificationView["campaign"]>) {
     setError("");
-    setResubmittingCampaignId(campaignId);
+    setResubmittingCampaignId(campaign.id);
 
-    const { error: updateError } = await supabase.from("campaigns").update({ status: "pending" }).eq("id", campaignId);
+    const { data, error: updateError } = await supabase
+      .from("campaigns")
+      .update({ status: "pending", review_round: campaign.review_round + 1 })
+      .eq("id", campaign.id)
+      .eq("review_round", campaign.review_round)
+      .select("review_round, status")
+      .single();
 
     setResubmittingCampaignId("");
 
@@ -190,8 +202,11 @@ export default function Inbox() {
 
     setNotifications((current) =>
       current.map((notification) =>
-        notification.campaign?.id === campaignId
-          ? { ...notification, campaign: { ...notification.campaign, status: "pending" } }
+        notification.campaign?.id === campaign.id
+          ? {
+              ...notification,
+              campaign: { ...notification.campaign, review_round: data.review_round, status: data.status },
+            }
           : notification,
       ),
     );
@@ -292,7 +307,7 @@ export default function Inbox() {
                   <button
                     className="button button-primary"
                     type="button"
-                    onClick={() => resubmitCampaign(notification.campaign!.id)}
+                    onClick={() => resubmitCampaign(notification.campaign!)}
                     disabled={resubmittingCampaignId === notification.campaign.id}
                   >
                     {resubmittingCampaignId === notification.campaign.id ? "Resubmitting..." : "Resubmit campaign"}
