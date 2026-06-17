@@ -139,7 +139,7 @@ export default function Layout() {
         <Outlet />
       </main>
       <footer className="app-footer">
-        <span>Version 1.2.2</span>
+        <span>Version 1.1</span>
         <span>Created by Caleb Day</span>
       </footer>
     </div>

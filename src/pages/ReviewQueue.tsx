@@ -21,13 +21,16 @@ export default function ReviewQueue() {
         return;
       }
 
-      const campaignResponse = await supabase
-        .from("campaigns")
-        .select("*")
-        .neq("owner_id", user.id)
-        .in("status", ["pending", "in_review"])
-        .order("created_at", { ascending: true })
-        .limit(1);
+      const [campaignResponse, reviewedResponse] = await Promise.all([
+        supabase
+          .from("campaigns")
+          .select("*")
+          .neq("owner_id", user.id)
+          .in("status", ["pending", "in_review"])
+          .order("created_at", { ascending: true })
+          .limit(50),
+        supabase.from("reviews").select("campaign_id").eq("reviewer_id", user.id),
+      ]);
 
       if (campaignResponse.error) {
         setError(campaignResponse.error.message);
@@ -35,7 +38,8 @@ export default function ReviewQueue() {
         return;
       }
 
-      const nextCampaign = ((campaignResponse.data ?? []) as Campaign[])[0] ?? null;
+      const reviewedIds = new Set((reviewedResponse.data ?? []).map((review) => review.campaign_id));
+      const nextCampaign = ((campaignResponse.data ?? []) as Campaign[]).find((item) => !reviewedIds.has(item.id)) ?? null;
 
       setCampaign(nextCampaign);
       setLoading(false);

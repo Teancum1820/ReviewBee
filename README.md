@@ -11,8 +11,7 @@ ReviewBee does not use the Meta API, does not send email notifications for revie
 - Review queue that shows one available campaign at a time
 - Required checklist review flow with Pass, Fail, and Not Sure choices
 - In-app inbox notifications when a campaign is reviewed
-- Inbox and dashboard review summaries show the campaign link, reviewer, and whether the campaign passed or failed
-- Failed reviewed campaigns can be resubmitted into the review queue
+- Inbox notifications show the campaign link and whether the review passed or failed
 - Browser notifications while the app is open, when the user allows alerts
 - Review stats for all time, this week, and this month
 - Campaign detail pages where owners can view reviews and checklist results
@@ -152,5 +151,5 @@ React Router uses `HashRouter`, so page refreshes work on GitHub Pages.
 - **Review queue is empty:** You need a campaign submitted by a different user. Users cannot review their own campaigns.
 - **Duplicate review blocked:** Each user can review a campaign only once.
 - **No inbox notification:** Notifications are created by the database trigger after a review is inserted. Confirm the trigger was created by rerunning `supabase/schema.sql`.
-- **No browser notification:** Keep ReviewBee open in a browser tab, click **Enable alerts**, and allow notifications. Browser notifications depend on Supabase Realtime, so rerun `supabase/schema.sql` after pulling version 1.2.2 changes.
+- **No browser notification:** Keep ReviewBee open in a browser tab, click **Enable alerts**, and allow notifications. Browser notifications depend on Supabase Realtime, so rerun `supabase/schema.sql` after pulling version 1.1 changes.
 - **Build fails in GitHub Actions:** Confirm the Actions secrets or variables are set and named exactly `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.

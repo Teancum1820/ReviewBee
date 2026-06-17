@@ -442,11 +442,6 @@ p {
   gap: 1rem;
 }
 
-.campaign-card {
-  display: grid;
-  gap: 1rem;
-}
-
 .card {
   padding: 1rem;
 }
@@ -701,43 +696,6 @@ dd {
   margin-top: 0.85rem;
 }
 
-.campaign-actions,
-.reviewer-summary-list {
-  display: grid;
-  gap: 0.55rem;
-}
-
-.reviewer-summary-list > span,
-.campaign-card-note {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.reviewer-summary-row {
-  display: flex;
-  gap: 0.6rem;
-  align-items: center;
-  justify-content: space-between;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fffdf8;
-  padding: 0.6rem 0.7rem;
-}
-
-.resubmitted-label {
-  display: inline-flex;
-  min-height: 2.55rem;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid #b6e4c3;
-  border-radius: 8px;
-  background: var(--green-soft);
-  color: var(--green);
-  padding: 0.65rem 0.9rem;
-  font-weight: 800;
-  text-align: center;
-}
-
 .detail-card {
   display: grid;
   gap: 1rem;
@@ -817,14 +775,8 @@ dd {
 
   .stats-grid,
   .compact-list,
-  .checklist-result-row,
-  .reviewer-summary-row {
+  .checklist-result-row {
     grid-template-columns: 1fr;
-  }
-
-  .reviewer-summary-row {
-    align-items: flex-start;
-    flex-direction: column;
   }
 
   .card-header {
