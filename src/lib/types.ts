@@ -8,7 +8,6 @@ export type Campaign = {
   owner_notes: string | null;
   status: CampaignStatus;
   review_count: number;
-  review_round: number;
   created_at: string;
   updated_at: string;
 };
@@ -24,7 +23,6 @@ export type Review = {
   id: string;
   campaign_id: string;
   reviewer_id: string;
-  review_round: number;
   overall_notes: string | null;
   created_at: string;
 };

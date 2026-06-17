@@ -202,10 +202,9 @@ export default function Dashboard() {
 
     const { data, error: updateError } = await supabase
       .from("campaigns")
-      .update({ status: "pending", review_round: campaign.review_round + 1 })
+      .update({ status: "pending" })
       .eq("id", campaign.id)
-      .eq("review_round", campaign.review_round)
-      .select("review_round, status")
+      .select("status")
       .single();
 
     setResubmittingCampaignId("");
@@ -217,9 +216,7 @@ export default function Dashboard() {
 
     setCampaigns((current) =>
       current.map((currentCampaign) =>
-        currentCampaign.id === campaign.id
-          ? { ...currentCampaign, review_round: data.review_round, status: data.status }
-          : currentCampaign,
+        currentCampaign.id === campaign.id ? { ...currentCampaign, status: data.status } : currentCampaign,
       ),
     );
   }

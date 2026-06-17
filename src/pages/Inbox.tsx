@@ -6,7 +6,7 @@ import { supabase } from "../lib/supabaseClient";
 import type { Campaign, InboxNotification, Profile, Review, ReviewChecklistItem } from "../lib/types";
 
 type InboxNotificationView = InboxNotification & {
-  campaign?: Pick<Campaign, "id" | "ads_manager_link" | "nickname" | "status" | "review_round">;
+  campaign?: Pick<Campaign, "id" | "ads_manager_link" | "nickname" | "status">;
   result?: ReviewResult;
   reviewerName?: string;
   isLatestReview?: boolean;
@@ -59,10 +59,7 @@ export default function Inbox() {
 
       const [campaignResponse, reviewResponse, latestReviewResponse, checklistResponse] = await Promise.all([
         campaignIds.length > 0
-          ? supabase
-              .from("campaigns")
-              .select("id, ads_manager_link, nickname, status, review_round")
-              .in("id", campaignIds)
+          ? supabase.from("campaigns").select("id, ads_manager_link, nickname, status").in("id", campaignIds)
           : Promise.resolve({ data: [], error: null }),
         reviewIds.length > 0
           ? supabase.from("reviews").select("id, reviewer_id").in("id", reviewIds)
@@ -107,12 +104,9 @@ export default function Inbox() {
       }
 
       const campaignsById = new Map(
-        (
-          (campaignResponse.data ?? []) as Pick<
-            Campaign,
-            "id" | "ads_manager_link" | "nickname" | "status" | "review_round"
-          >[]
-        ).map((campaign) => [campaign.id, campaign]),
+        ((campaignResponse.data ?? []) as Pick<Campaign, "id" | "ads_manager_link" | "nickname" | "status">[]).map(
+          (campaign) => [campaign.id, campaign],
+        ),
       );
       const reviewsById = new Map(reviewRows.map((review) => [review.id, review]));
       const latestReviewIdByCampaignId = new Map<string, string>();
@@ -187,10 +181,9 @@ export default function Inbox() {
 
     const { data, error: updateError } = await supabase
       .from("campaigns")
-      .update({ status: "pending", review_round: campaign.review_round + 1 })
+      .update({ status: "pending" })
       .eq("id", campaign.id)
-      .eq("review_round", campaign.review_round)
-      .select("review_round, status")
+      .select("status")
       .single();
 
     setResubmittingCampaignId("");
@@ -203,10 +196,7 @@ export default function Inbox() {
     setNotifications((current) =>
       current.map((notification) =>
         notification.campaign?.id === campaign.id
-          ? {
-              ...notification,
-              campaign: { ...notification.campaign, review_round: data.review_round, status: data.status },
-            }
+          ? { ...notification, campaign: { ...notification.campaign, status: data.status } }
           : notification,
       ),
     );
