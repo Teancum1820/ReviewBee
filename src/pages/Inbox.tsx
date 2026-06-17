@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { REVIEW_CHECKLIST } from "../lib/checklist";
+import { notifyNotificationCounterUpdated } from "../lib/notificationEvents";
 import { supabase } from "../lib/supabaseClient";
-import type { InboxNotification } from "../lib/types";
+import type { Campaign, InboxNotification, ReviewChecklistItem } from "../lib/types";
+
+type ReviewResult = "passed" | "failed";
+
+type InboxNotificationView = InboxNotification & {
+  campaign?: Pick<Campaign, "id" | "ads_manager_link" | "nickname">;
+  result?: ReviewResult;
+};
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat(undefined, {
@@ -14,7 +23,7 @@ function formatDate(value: string) {
 }
 
 export default function Inbox() {
-  const [notifications, setNotifications] = useState<InboxNotification[]>([]);
+  const [notifications, setNotifications] = useState<InboxNotificationView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -39,7 +48,64 @@ export default function Inbox() {
     if (notificationError) {
       setError(notificationError.message);
     } else {
-      setNotifications((data ?? []) as InboxNotification[]);
+      const notificationRows = (data ?? []) as InboxNotification[];
+      const campaignIds = Array.from(
+        new Set(notificationRows.map((notification) => notification.campaign_id).filter(Boolean) as string[]),
+      );
+      const reviewIds = Array.from(
+        new Set(notificationRows.map((notification) => notification.review_id).filter(Boolean) as string[]),
+      );
+
+      const [campaignResponse, checklistResponse] = await Promise.all([
+        campaignIds.length > 0
+          ? supabase.from("campaigns").select("id, ads_manager_link, nickname").in("id", campaignIds)
+          : Promise.resolve({ data: [], error: null }),
+        reviewIds.length > 0
+          ? supabase.from("review_checklist_items").select("review_id, status").in("review_id", reviewIds)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
+
+      if (campaignResponse.error) {
+        setError(campaignResponse.error.message);
+      }
+
+      if (checklistResponse.error) {
+        setError(checklistResponse.error.message);
+      }
+
+      const campaignsById = new Map(
+        ((campaignResponse.data ?? []) as Pick<Campaign, "id" | "ads_manager_link" | "nickname">[]).map((campaign) => [
+          campaign.id,
+          campaign,
+        ]),
+      );
+
+      const checklistItemsByReviewId = ((checklistResponse.data ?? []) as Pick<
+        ReviewChecklistItem,
+        "review_id" | "status"
+      >[]).reduce<Record<string, Pick<ReviewChecklistItem, "review_id" | "status">[]>>((grouped, item) => {
+        grouped[item.review_id] = grouped[item.review_id] ?? [];
+        grouped[item.review_id].push(item);
+        return grouped;
+      }, {});
+
+      setNotifications(
+        notificationRows.map((notification) => {
+          const checklistItems = notification.review_id ? checklistItemsByReviewId[notification.review_id] ?? [] : [];
+          const result =
+            checklistItems.length >= REVIEW_CHECKLIST.length && checklistItems.every((item) => item.status === "pass")
+              ? "passed"
+              : checklistItems.length > 0
+                ? "failed"
+                : undefined;
+
+          return {
+            ...notification,
+            campaign: notification.campaign_id ? campaignsById.get(notification.campaign_id) : undefined,
+            result,
+          };
+        }),
+      );
     }
 
     setLoading(false);
@@ -65,6 +131,7 @@ export default function Inbox() {
         notification.id === notificationId ? { ...notification, is_read: true } : notification,
       ),
     );
+    notifyNotificationCounterUpdated();
   }
 
   async function markAllAsRead() {
@@ -85,6 +152,7 @@ export default function Inbox() {
     }
 
     setNotifications((current) => current.map((notification) => ({ ...notification, is_read: true })));
+    notifyNotificationCounterUpdated();
   }
 
   const unreadCount = notifications.filter((notification) => !notification.is_read).length;
@@ -118,16 +186,38 @@ export default function Inbox() {
             <div>
               <div className="notification-title-row">
                 <h3>{notification.message}</h3>
+                {notification.result ? (
+                  <span className={`result-pill ${notification.result === "passed" ? "result-pass" : "result-fail"}`}>
+                    {notification.result === "passed" ? "Passed" : "Failed"}
+                  </span>
+                ) : null}
                 <span className={notification.is_read ? "read-label" : "unread-label"}>
                   {notification.is_read ? "Read" : "Unread"}
                 </span>
               </div>
               <p className="muted">{formatDate(notification.created_at)}</p>
-              {notification.campaign_id ? (
-                <Link className="inline-link" to={`/campaign/${notification.campaign_id}`}>
-                  View campaign
-                </Link>
+              {notification.campaign ? (
+                <p className="muted notification-campaign-name">
+                  {notification.campaign.nickname || "Untitled campaign"}
+                </p>
               ) : null}
+              <div className="notification-actions">
+                {notification.campaign ? (
+                  <a
+                    className="button button-secondary"
+                    href={notification.campaign.ads_manager_link}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open campaign link
+                  </a>
+                ) : null}
+                {notification.campaign_id ? (
+                  <Link className="button button-ghost" to={`/campaign/${notification.campaign_id}`}>
+                    View details
+                  </Link>
+                ) : null}
+              </div>
             </div>
             {!notification.is_read ? (
               <button className="button button-ghost" type="button" onClick={() => markAsRead(notification.id)}>

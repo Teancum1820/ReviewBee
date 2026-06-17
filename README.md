@@ -6,11 +6,13 @@ ReviewBee does not use the Meta API, does not send email notifications for revie
 
 ## Features
 
-- Email and password sign up, login, and logout with Supabase Auth
+- Username and password sign up, login, and logout with Supabase Auth
 - Campaign submission with an Ads Manager link, nickname, and reviewer notes
 - Review queue that shows one available campaign at a time
 - Required checklist review flow with Pass, Fail, and Not Sure choices
 - In-app inbox notifications when a campaign is reviewed
+- Inbox notifications show the campaign link and whether the review passed or failed
+- Browser notifications while the app is open, when the user allows alerts
 - Review stats for all time, this week, and this month
 - Campaign detail pages where owners can view reviews and checklist results
 - Supabase Row Level Security policies for private campaign and review data
@@ -47,6 +49,8 @@ ReviewBee does not use the Meta API, does not send email notifications for revie
    - Create a free account or log in.
    - Create a new project.
    - Wait for the project to finish provisioning.
+   - Go to **Authentication** > **Providers** > **Email**.
+   - Turn off **Confirm email**. ReviewBee uses username sign-in, so users do not verify an email address.
 
 4. Find your Supabase Project URL and anon key:
 
@@ -85,15 +89,15 @@ ReviewBee does not use the Meta API, does not send email notifications for revie
 
 Use two different user accounts. You can use two browsers, one normal window plus one private window, or log out between steps.
 
-- User A signs up or logs in.
+- User A signs up or logs in with a username and password.
 - User A submits a campaign.
-- User B signs up or logs in.
+- User B signs up or logs in with a different username and password.
 - User B opens the Review Queue and reviews User A's campaign.
 - User A receives an inbox notification.
 - User A opens the campaign detail page to see the review.
 - User B's review stats increase.
 
-For easy local testing, you may want to disable email confirmation in Supabase Auth settings. ReviewBee itself does not send review emails.
+ReviewBee creates an internal Supabase Auth email from each username, but users never enter or verify an email address. Browser notifications work while the app is open after the user clicks **Enable alerts** and allows notifications in the browser.
 
 ## Push to GitHub
 
@@ -142,9 +146,10 @@ React Router uses `HashRouter`, so page refreshes work on GitHub Pages.
 
 - **Blank page on GitHub Pages:** Check that the repository name matches the base path in `vite.config.ts`.
 - **Cannot sign in:** Confirm `.env.local` has the correct Supabase Project URL and anon key.
-- **Sign up says to confirm email:** Supabase email confirmation is enabled. Confirm the account or disable confirmation for local testing.
+- **Sign up says to confirm email:** Supabase email confirmation is enabled. Turn off **Confirm email** under **Authentication** > **Providers** > **Email**.
 - **Database insert is blocked:** Make sure `supabase/schema.sql` was run successfully and Row Level Security policies were created.
 - **Review queue is empty:** You need a campaign submitted by a different user. Users cannot review their own campaigns.
 - **Duplicate review blocked:** Each user can review a campaign only once.
 - **No inbox notification:** Notifications are created by the database trigger after a review is inserted. Confirm the trigger was created by rerunning `supabase/schema.sql`.
+- **No browser notification:** Keep ReviewBee open in a browser tab, click **Enable alerts**, and allow notifications. Browser notifications depend on Supabase Realtime, so rerun `supabase/schema.sql` after pulling version 1.1 changes.
 - **Build fails in GitHub Actions:** Confirm the Actions secrets or variables are set and named exactly `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
