@@ -12,6 +12,13 @@ export type Campaign = {
   updated_at: string;
 };
 
+export type Profile = {
+  id: string;
+  email: string | null;
+  display_name: string | null;
+  created_at: string;
+};
+
 export type Review = {
   id: string;
   campaign_id: string;

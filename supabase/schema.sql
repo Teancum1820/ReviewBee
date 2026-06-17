@@ -195,6 +195,19 @@ create policy "Users can read their own profile"
 on public.profiles for select
 using (auth.uid() = id);
 
+drop policy if exists "Campaign owners can read reviewer profiles" on public.profiles;
+create policy "Campaign owners can read reviewer profiles"
+on public.profiles for select
+using (
+  exists (
+    select 1
+    from public.reviews
+    join public.campaigns on campaigns.id = reviews.campaign_id
+    where reviews.reviewer_id = profiles.id
+      and campaigns.owner_id = auth.uid()
+  )
+);
+
 drop policy if exists "Users can insert their own profile" on public.profiles;
 create policy "Users can insert their own profile"
 on public.profiles for insert
