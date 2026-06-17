@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { REVIEW_CHECKLIST } from "../lib/checklist";
 import { notifyNotificationCounterUpdated } from "../lib/notificationEvents";
-import { getReviewerName, getReviewResult, getReviewResultLabel, type ReviewResult } from "../lib/reviewResults";
 import { supabase } from "../lib/supabaseClient";
-import type { Campaign, InboxNotification, Profile, Review, ReviewChecklistItem } from "../lib/types";
+import type { Campaign, InboxNotification, ReviewChecklistItem } from "../lib/types";
+
+type ReviewResult = "passed" | "failed";
 
 type InboxNotificationView = InboxNotification & {
-  campaign?: Pick<Campaign, "id" | "ads_manager_link" | "nickname" | "status">;
+  campaign?: Pick<Campaign, "id" | "ads_manager_link" | "nickname">;
   result?: ReviewResult;
-  reviewerName?: string;
-  isLatestReview?: boolean;
 };
 
 function formatDate(value: string) {
@@ -26,7 +26,6 @@ export default function Inbox() {
   const [notifications, setNotifications] = useState<InboxNotificationView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [resubmittingCampaignId, setResubmittingCampaignId] = useState("");
 
   async function loadNotifications() {
     setLoading(true);
@@ -57,19 +56,9 @@ export default function Inbox() {
         new Set(notificationRows.map((notification) => notification.review_id).filter(Boolean) as string[]),
       );
 
-      const [campaignResponse, reviewResponse, latestReviewResponse, checklistResponse] = await Promise.all([
+      const [campaignResponse, checklistResponse] = await Promise.all([
         campaignIds.length > 0
-          ? supabase.from("campaigns").select("id, ads_manager_link, nickname, status").in("id", campaignIds)
-          : Promise.resolve({ data: [], error: null }),
-        reviewIds.length > 0
-          ? supabase.from("reviews").select("id, reviewer_id").in("id", reviewIds)
-          : Promise.resolve({ data: [], error: null }),
-        campaignIds.length > 0
-          ? supabase
-              .from("reviews")
-              .select("id, campaign_id, created_at")
-              .in("campaign_id", campaignIds)
-              .order("created_at", { ascending: false })
+          ? supabase.from("campaigns").select("id, ads_manager_link, nickname").in("id", campaignIds)
           : Promise.resolve({ data: [], error: null }),
         reviewIds.length > 0
           ? supabase.from("review_checklist_items").select("review_id, status").in("review_id", reviewIds)
@@ -80,45 +69,14 @@ export default function Inbox() {
         setError(campaignResponse.error.message);
       }
 
-      if (reviewResponse.error) {
-        setError(reviewResponse.error.message);
-      }
-
-      if (latestReviewResponse.error) {
-        setError(latestReviewResponse.error.message);
-      }
-
       if (checklistResponse.error) {
         setError(checklistResponse.error.message);
       }
 
-      const reviewRows = (reviewResponse.data ?? []) as Pick<Review, "id" | "reviewer_id">[];
-      const reviewerIds = Array.from(new Set(reviewRows.map((review) => review.reviewer_id)));
-      const profileResponse =
-        reviewerIds.length > 0
-          ? await supabase.from("profiles").select("id, display_name, email").in("id", reviewerIds)
-          : { data: [], error: null };
-
-      if (profileResponse.error) {
-        setError(profileResponse.error.message);
-      }
-
       const campaignsById = new Map(
-        ((campaignResponse.data ?? []) as Pick<Campaign, "id" | "ads_manager_link" | "nickname" | "status">[]).map(
-          (campaign) => [campaign.id, campaign],
-        ),
-      );
-      const reviewsById = new Map(reviewRows.map((review) => [review.id, review]));
-      const latestReviewIdByCampaignId = new Map<string, string>();
-      ((latestReviewResponse.data ?? []) as Pick<Review, "id" | "campaign_id">[]).forEach((review) => {
-        if (!latestReviewIdByCampaignId.has(review.campaign_id)) {
-          latestReviewIdByCampaignId.set(review.campaign_id, review.id);
-        }
-      });
-      const profilesById = new Map(
-        ((profileResponse.data ?? []) as Pick<Profile, "id" | "display_name" | "email">[]).map((profile) => [
-          profile.id,
-          profile,
+        ((campaignResponse.data ?? []) as Pick<Campaign, "id" | "ads_manager_link" | "nickname">[]).map((campaign) => [
+          campaign.id,
+          campaign,
         ]),
       );
 
@@ -134,16 +92,17 @@ export default function Inbox() {
       setNotifications(
         notificationRows.map((notification) => {
           const checklistItems = notification.review_id ? checklistItemsByReviewId[notification.review_id] ?? [] : [];
-          const review = notification.review_id ? reviewsById.get(notification.review_id) : undefined;
+          const result =
+            checklistItems.length >= REVIEW_CHECKLIST.length && checklistItems.every((item) => item.status === "pass")
+              ? "passed"
+              : checklistItems.length > 0
+                ? "failed"
+                : undefined;
 
           return {
             ...notification,
             campaign: notification.campaign_id ? campaignsById.get(notification.campaign_id) : undefined,
-            result: getReviewResult(checklistItems),
-            reviewerName: review ? getReviewerName(profilesById.get(review.reviewer_id), review.reviewer_id) : undefined,
-            isLatestReview:
-              Boolean(notification.campaign_id && notification.review_id) &&
-              latestReviewIdByCampaignId.get(notification.campaign_id ?? "") === notification.review_id,
+            result,
           };
         }),
       );
@@ -173,33 +132,6 @@ export default function Inbox() {
       ),
     );
     notifyNotificationCounterUpdated();
-  }
-
-  async function resubmitCampaign(campaign: NonNullable<InboxNotificationView["campaign"]>) {
-    setError("");
-    setResubmittingCampaignId(campaign.id);
-
-    const { data, error: updateError } = await supabase
-      .from("campaigns")
-      .update({ status: "pending" })
-      .eq("id", campaign.id)
-      .select("status")
-      .single();
-
-    setResubmittingCampaignId("");
-
-    if (updateError) {
-      setError(updateError.message);
-      return;
-    }
-
-    setNotifications((current) =>
-      current.map((notification) =>
-        notification.campaign?.id === campaign.id
-          ? { ...notification, campaign: { ...notification.campaign, status: data.status } }
-          : notification,
-      ),
-    );
   }
 
   async function markAllAsRead() {
@@ -256,7 +188,7 @@ export default function Inbox() {
                 <h3>{notification.message}</h3>
                 {notification.result ? (
                   <span className={`result-pill ${notification.result === "passed" ? "result-pass" : "result-fail"}`}>
-                    {getReviewResultLabel(notification.result)}
+                    {notification.result === "passed" ? "Passed" : "Failed"}
                   </span>
                 ) : null}
                 <span className={notification.is_read ? "read-label" : "unread-label"}>
@@ -266,14 +198,8 @@ export default function Inbox() {
               <p className="muted">{formatDate(notification.created_at)}</p>
               {notification.campaign ? (
                 <p className="muted notification-campaign-name">
-                  Campaign:{" "}
-                  <Link className="inline-link" to={`/campaign/${notification.campaign.id}`}>
-                    {notification.campaign.nickname || "Untitled campaign"}
-                  </Link>
+                  {notification.campaign.nickname || "Untitled campaign"}
                 </p>
-              ) : null}
-              {notification.reviewerName ? (
-                <p className="muted notification-campaign-name">Reviewed by {notification.reviewerName}</p>
               ) : null}
               <div className="notification-actions">
                 {notification.campaign ? (
@@ -290,24 +216,6 @@ export default function Inbox() {
                   <Link className="button button-ghost" to={`/campaign/${notification.campaign_id}`}>
                     View details
                   </Link>
-                ) : null}
-                {notification.result === "failed" &&
-                notification.campaign?.status === "reviewed" &&
-                notification.isLatestReview ? (
-                  <button
-                    className="button button-primary"
-                    type="button"
-                    onClick={() => resubmitCampaign(notification.campaign!)}
-                    disabled={resubmittingCampaignId === notification.campaign.id}
-                  >
-                    {resubmittingCampaignId === notification.campaign.id ? "Resubmitting..." : "Resubmit campaign"}
-                  </button>
-                ) : null}
-                {notification.result === "failed" &&
-                notification.campaign &&
-                notification.campaign.status !== "reviewed" &&
-                notification.isLatestReview ? (
-                  <span className="resubmitted-label">Resubmitted for review</span>
                 ) : null}
               </div>
             </div>

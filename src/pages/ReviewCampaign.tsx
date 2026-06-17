@@ -5,7 +5,7 @@ import { REVIEW_CHECKLIST, type ChecklistStatus } from "../lib/checklist";
 import { supabase } from "../lib/supabaseClient";
 import type { Campaign } from "../lib/types";
 
-type ReviewState = "loading" | "ready" | "own_campaign" | "unavailable" | "submitted";
+type ReviewState = "loading" | "ready" | "own_campaign" | "already_reviewed" | "unavailable" | "submitted";
 
 export default function ReviewCampaign() {
   const { campaignId } = useParams();
@@ -59,7 +59,14 @@ export default function ReviewCampaign() {
         return;
       }
 
-      setReviewState("ready");
+      const { data: existingReview } = await supabase
+        .from("reviews")
+        .select("id")
+        .eq("campaign_id", nextCampaign.id)
+        .eq("reviewer_id", user.id)
+        .maybeSingle();
+
+      setReviewState(existingReview ? "already_reviewed" : "ready");
     }
 
     loadCampaign();
@@ -111,6 +118,11 @@ export default function ReviewCampaign() {
 
     if (reviewError) {
       setSubmitting(false);
+      if (reviewError.code === "23505") {
+        setReviewState("already_reviewed");
+        return;
+      }
+
       setError(reviewError.message);
       return;
     }
@@ -165,6 +177,18 @@ export default function ReviewCampaign() {
         <p>Open the review queue to find a campaign from another user.</p>
         <Link className="button button-primary" to="/review">
           Review Queue
+        </Link>
+      </div>
+    );
+  }
+
+  if (reviewState === "already_reviewed") {
+    return (
+      <div className="narrow-page empty-state">
+        <h1>You already reviewed this campaign</h1>
+        <p>Each reviewer can submit one review per campaign.</p>
+        <Link className="button button-primary" to="/review">
+          Back to Review Queue
         </Link>
       </div>
     );

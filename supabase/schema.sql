@@ -24,30 +24,9 @@ create table if not exists public.reviews (
   campaign_id uuid references public.campaigns(id) on delete cascade not null,
   reviewer_id uuid references public.profiles(id) on delete cascade not null,
   overall_notes text,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  constraint reviews_campaign_reviewer_unique unique (campaign_id, reviewer_id)
 );
-
-drop policy if exists "Users can insert eligible reviews" on public.reviews;
-
-alter table public.campaigns
-  drop constraint if exists campaigns_review_round_nonnegative;
-
-alter table public.reviews
-  drop constraint if exists reviews_review_round_nonnegative;
-
-alter table public.reviews
-  drop constraint if exists reviews_campaign_reviewer_unique;
-
-alter table public.reviews
-  drop constraint if exists reviews_campaign_reviewer_round_unique;
-
-drop index if exists public.reviews_campaign_round_idx;
-
-alter table public.campaigns
-  drop column if exists review_round;
-
-alter table public.reviews
-  drop column if exists review_round;
 
 create table if not exists public.review_checklist_items (
   id uuid primary key default gen_random_uuid(),
@@ -215,19 +194,6 @@ drop policy if exists "Users can read their own profile" on public.profiles;
 create policy "Users can read their own profile"
 on public.profiles for select
 using (auth.uid() = id);
-
-drop policy if exists "Campaign owners can read reviewer profiles" on public.profiles;
-create policy "Campaign owners can read reviewer profiles"
-on public.profiles for select
-using (
-  exists (
-    select 1
-    from public.reviews
-    join public.campaigns on campaigns.id = reviews.campaign_id
-    where reviews.reviewer_id = profiles.id
-      and campaigns.owner_id = auth.uid()
-  )
-);
 
 drop policy if exists "Users can insert their own profile" on public.profiles;
 create policy "Users can insert their own profile"
