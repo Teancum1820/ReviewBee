@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { REVIEW_CHECKLIST } from "../lib/checklist";
+import { notifyNotificationCounterUpdated } from "../lib/notificationEvents";
 import { supabase } from "../lib/supabaseClient";
 import type { Campaign, InboxNotification, ReviewChecklistItem } from "../lib/types";
 
@@ -130,6 +131,7 @@ export default function Inbox() {
         notification.id === notificationId ? { ...notification, is_read: true } : notification,
       ),
     );
+    notifyNotificationCounterUpdated();
   }
 
   async function markAllAsRead() {
@@ -150,6 +152,7 @@ export default function Inbox() {
     }
 
     setNotifications((current) => current.map((notification) => ({ ...notification, is_read: true })));
+    notifyNotificationCounterUpdated();
   }
 
   const unreadCount = notifications.filter((notification) => !notification.is_read).length;

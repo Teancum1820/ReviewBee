@@ -174,6 +174,26 @@ p {
   color: var(--ink);
 }
 
+.nav-link-with-badge {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.nav-badge {
+  display: inline-grid;
+  min-width: 1.45rem;
+  height: 1.45rem;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--red);
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 900;
+  line-height: 1;
+  padding: 0 0.35rem;
+}
+
 .account-strip {
   display: flex;
   min-width: 0;
