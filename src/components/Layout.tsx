@@ -40,6 +40,10 @@ export default function Layout() {
       <main className="page-container">
         <Outlet />
       </main>
+      <footer className="app-footer">
+        <span>Version 1.0</span>
+        <span>Created by Caleb Day</span>
+      </footer>
     </div>
   );
 }
